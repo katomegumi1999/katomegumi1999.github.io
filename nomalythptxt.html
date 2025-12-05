@@ -275,10 +275,39 @@
                 <button class="btn-primary" id="btnDownloadAll" disabled>打包下载</button>
                 <button class="btn-outline" id="btnClear" disabled>清空</button>
             </div>
+            <!-- Log Area -->
+            <div class="log-section"
+                style="height: 150px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; background: #fff;">
+                <div class="log-header"
+                    style="padding: 5px 10px; font-weight: bold; background: #f9fafb; border-bottom: 1px solid var(--border-color); font-size: 0.85rem; display: flex; justify-content: space-between;">
+                    <span>运行日志</span>
+                    <span style="cursor: pointer; color: var(--primary-color);"
+                        onclick="document.getElementById('logContent').innerHTML=''">清空日志</span>
+                </div>
+                <div id="logContent"
+                    style="flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 0.8rem; color: #333;">
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // --- Logging ---
+        function log(msg, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            if (!logContent) return;
+            const div = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            div.style.marginBottom = '4px';
+            if (type === 'error') div.style.color = 'var(--error)';
+            else if (type === 'warning') div.style.color = 'var(--warning)';
+            else if (type === 'success') div.style.color = 'var(--success)';
+
+            div.innerText = `[${time}] ${msg}`;
+            logContent.appendChild(div);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
         // --- Logic: File Parser ---
         async function detectEncoding(file) {
             return new Promise((resolve, reject) => {
@@ -443,13 +472,21 @@
             try {
                 const { lines, encoding, confidence } = await readTxtFile(file);
                 if (encoding && encoding.toLowerCase() !== 'utf-8') {
-                    messages.push(`编码非UTF-8: ${encoding}`);
+                    const msg = `编码非UTF-8: ${encoding} (置信度: ${confidence})`;
+                    messages.push(msg);
+                    log(`[${file.name}] ${msg}`, 'warning');
                     status = 'warning';
                 }
-                if (!lines || lines.length === 0) return { file, status: 'error', messages: ['无法读取文件'] };
+                if (!lines || lines.length === 0) {
+                    log(`[${file.name}] 无法读取文件`, 'error');
+                    return { file, status: 'error', messages: ['无法读取文件'] };
+                }
 
                 const blocks = parseBlocks(lines);
-                if (!blocks || blocks.length === 0) return { file, status: 'error', messages: ['未找到地块数据'] };
+                if (!blocks || blocks.length === 0) {
+                    log(`[${file.name}] 未找到地块数据`, 'error');
+                    return { file, status: 'error', messages: ['未找到地块数据'] };
+                }
 
                 let hasDense = false;
                 let hasMismatch = false;
@@ -479,9 +516,15 @@
                     }
                 });
 
-                if (hasDense || hasMismatch) status = 'warning';
+                if (hasDense || hasMismatch) {
+                    status = 'warning';
+                    messages.forEach(m => log(`[${file.name}] ${m}`, 'warning'));
+                } else {
+                    log(`[${file.name}] 检查通过`, 'success');
+                }
                 return { file, status, messages };
             } catch (e) {
+                log(`[${file.name}] 修复失败: ${e.message}`, 'error');
                 return { file, status: 'error', messages: [e.message] };
             }
         }
@@ -588,6 +631,7 @@
                     processedFilename: newFilename
                 };
             } catch (e) {
+                log(`[${file.name}] 修复失败: ${e.message}`, 'error');
                 return { file, status: 'error', messages: [e.message] };
             }
         }
@@ -630,6 +674,7 @@
             // Process
             const startIndex = filesData.length - newFiles.length;
             for (let i = 0; i < newFiles.length; i++) {
+                log(`开始处理: ${newFiles[i].name}`);
                 const result = await processFile(newFiles[i]);
                 filesData[startIndex + i] = result;
             }
@@ -702,7 +747,9 @@
             for (let i = 0; i < filesData.length; i++) {
                 // Update status to processing visually? 
                 // Skipping visual update for speed, just wait for result
+                log(`正在修复 (${mode}): ${filesData[i].file.name}`);
                 filesData[i] = await fixFile(filesData[i].file, mode);
+                log(`修复完成: ${filesData[i].file.name}`, 'success');
             }
             renderFileList();
             updateControls();
