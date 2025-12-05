@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>省坐标txt规范工具 (单文件版)</title>
+    <!-- 引入依赖库 -->
+    <script src="https://cdn.jsdelivr.net/npm/jschardet@3.0.0/dist/jschardet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+            --border-color: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 80vh;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        p {
+            margin: 5px 0 0;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Dropzone */
+        .dropzone {
+            flex: 1;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+
+        .dropzone:hover,
+        .dropzone.dragover {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+        }
+
+        .dropzone-icon {
+            font-size: 48px;
+            color: #9ca3af;
+            margin-bottom: 10px;
+        }
+
+        /* File List */
+        .file-list-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            background: #f9fafb;
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .file-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+            font-weight: 500;
+        }
+
+        .file-size {
+            color: var(--text-sub);
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-normal {
+            color: var(--success);
+            background: #d1fae5;
+        }
+
+        .status-warning {
+            color: var(--warning);
+            background: #fef3c7;
+        }
+
+        .status-error {
+            color: var(--error);
+            background: #fee2e2;
+        }
+
+        .status-processing {
+            color: var(--primary-color);
+            background: #dbeafe;
+        }
+
+        /* Controls */
+        .controls {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: #f9fafb;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.2s;
+            font-size: 0.9rem;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #4b5563;
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 1px solid #d1d5db;
+            color: var(--text-main);
+        }
+
+        .download-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>省坐标txt规范工具 (单文件版)</h1>
+        <p>拖拽文件或文件夹 • 自动检测编码 • 批量处理 • 本地运行</p>
+    </header>
+
+    <div class="container">
+        <!-- Left: Dropzone -->
+        <div class="card">
+            <div class="dropzone" id="dropzone">
+                <div class="dropzone-icon">📂</div>
+                <div style="font-size: 1.1rem; font-weight: 500; color: var(--text-main);">拖入文件或点击选择</div>
+                <div style="color: var(--text-sub); margin-top: 5px;">支持多个 .txt 文件</div>
+                <input type="file" id="fileInput" multiple accept=".txt" class="hidden">
+            </div>
+        </div>
+
+        <!-- Right: File List & Controls -->
+        <div class="card">
+            <div class="file-list-header">文件列表 (<span id="fileCount">0</span>)</div>
+            <div class="file-list" id="fileList">
+                <!-- Files will be inserted here -->
+            </div>
+            <div class="controls">
+                <button class="btn-warning" id="btnFixDense" disabled>修复点密集</button>
+                <button class="btn-secondary" id="btnNormalize" disabled>规范化txt</button>
+                <button class="btn-danger" id="btnFixAll" disabled>全部修复</button>
+                <div style="flex: 1;"></div>
+                <button class="btn-primary" id="btnDownloadAll" disabled>打包下载</button>
+                <button class="btn-outline" id="btnClear" disabled>清空</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Logic: File Parser ---
+        async function detectEncoding(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const result = e.target.result;
+                    const detected = jschardet.detect(result);
+                    resolve({ encoding: detected.encoding || 'utf-8', confidence: detected.confidence || 0 });
+                };
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsBinaryString(file.slice(0, 4096));
+            });
+        }
+
+        async function readTxtFile(file) {
+            const { encoding, confidence } = await detectEncoding(file);
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    const lines = text.split(/\r?\n/);
+                    resolve({ lines, encoding, confidence });
+                };
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsText(file, encoding || 'utf-8');
+            });
+        }
+
+        function parseBlocks(lines) {
+            const blocks = [];
+            let currentBlock = [];
+            let inCoords = false;
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                if (trimmed.startsWith('[地块坐标]')) {
+                    inCoords = true;
+                    continue;
+                }
+                if (!inCoords) continue;
+
+                if ((trimmed.match(/,/g) || []).length >= 8 && trimmed.endsWith('@')) {
+                    if (currentBlock.length > 0) {
+                        blocks.push(currentBlock);
+                        currentBlock = [];
+                    }
+                    continue;
+                }
+
+                if ((trimmed.match(/,/g) || []).length >= 3) {
+                    const parts = trimmed.split(',');
+                    try {
+                        const y = parseFloat(parts[2]);
+                        const x = parseFloat(parts[3]);
+                        if (!isNaN(x) && !isNaN(y)) {
+                            currentBlock.push({ x, y, raw: line });
+                        }
+                    } catch (e) { continue; }
+                }
+            }
+            if (currentBlock.length > 0) blocks.push(currentBlock);
+            return blocks;
+        }
+
+        // --- Logic: Geometry ---
+        function calcDistances(points) {
+            const dists = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                dists.push({ raw1: p1.raw.trim(), raw2: p2.raw.trim(), dist });
+            }
+            return dists;
+        }
+
+        function polygonWithRingsArea(points, ringStartIndices) {
+            if (points.length < 3) return 0.0;
+            if (ringStartIndices.length < 3) {
+                // Simple polygon area
+                let area = 0.0;
+                const pts = [...points];
+                if (pts[0].x !== pts[pts.length - 1].x || pts[0].y !== pts[pts.length - 1].y) pts.push(pts[0]);
+                for (let i = 0; i < pts.length - 1; i++) {
+                    area += (pts[i].x * pts[i + 1].y - pts[i + 1].x * pts[i].y);
+                }
+                return Math.abs(area) / 2;
+            }
+
+            let totalArea = 0.0;
+            for (let i = 0; i < ringStartIndices.length - 1; i++) {
+                const startIdx = ringStartIndices[i];
+                const endIdx = ringStartIndices[i + 1];
+                let ringPoints = points.slice(startIdx, endIdx);
+                if (ringPoints.length > 0 && (ringPoints[0].x !== ringPoints[ringPoints.length - 1].x || ringPoints[0].y !== ringPoints[ringPoints.length - 1].y)) {
+                    ringPoints = [...ringPoints, ringPoints[0]];
+                }
+                let ringArea = 0.0;
+                for (let j = 0; j < ringPoints.length - 1; j++) {
+                    ringArea += (ringPoints[j].x * ringPoints[j + 1].y - ringPoints[j + 1].x * ringPoints[j].y);
+                }
+                if (i === 0) totalArea += Math.abs(ringArea) / 2;
+                else totalArea -= Math.abs(ringArea) / 2;
+            }
+            return totalArea;
+        }
+
+        function fixDensePoints(blockLines) {
+            const points = [];
+            for (const line of blockLines) {
+                const parts = line.trim().split(',');
+                try {
+                    const y = parseFloat(parts[2]);
+                    const x = parseFloat(parts[3]);
+                    if (!isNaN(x) && !isNaN(y)) points.push({ x, y, line });
+                } catch (e) { }
+            }
+
+            if (points.length <= 1) return { fixedLines: blockLines, removedCount: 0 };
+
+            const xyPoints = points.map(p => ({ x: p.x, y: p.y }));
+            const ringStartIndices = [0];
+            const n = xyPoints.length;
+            let currentFirstXY = xyPoints[0];
+            let i = 1;
+            while (i < n - 1) {
+                if (xyPoints[i].x === currentFirstXY.x && xyPoints[i].y === currentFirstXY.y && i + 1 < n) {
+                    ringStartIndices.push(i + 1);
+                    currentFirstXY = xyPoints[i + 1];
+                    i += 1;
+                }
+                i += 1;
+            }
+            ringStartIndices.push(n);
+
+            const toRemove = new Set();
+            for (let i = 0; i < points.length - 1; i++) {
+                if (ringStartIndices.includes(i)) continue;
+                if (toRemove.has(i)) continue;
+                let j = i + 1;
+                while (j < points.length) {
+                    if (ringStartIndices.includes(j)) { j++; continue; }
+                    if (toRemove.has(j)) { j++; continue; }
+                    const dist = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+                    if (dist < 0.01) {
+                        if (i === 0 && j === points.length - 1) toRemove.add(j);
+                        else if (!ringStartIndices.includes(i)) toRemove.add(i);
+                        break;
+                    }
+                    j++;
+                }
+            }
+            const fixedLines = points.filter((_, idx) => !toRemove.has(idx)).map(p => p.line);
+            return { fixedLines, removedCount: toRemove.size };
+        }
+
+        // --- Logic: Processor ---
+        async function processFile(file) {
+            const messages = [];
+            let status = 'normal';
+            try {
+                const { lines, encoding, confidence } = await readTxtFile(file);
+                if (encoding && encoding.toLowerCase() !== 'utf-8') {
+                    messages.push(`编码非UTF-8: ${encoding}`);
+                    status = 'warning';
+                }
+                if (!lines || lines.length === 0) return { file, status: 'error', messages: ['无法读取文件'] };
+
+                const blocks = parseBlocks(lines);
+                if (!blocks || blocks.length === 0) return { file, status: 'error', messages: ['未找到地块数据'] };
+
+                let hasDense = false;
+                let hasMismatch = false;
+
+                blocks.forEach((points, idx) => {
+                    if (points.length < 2) {
+                        messages.push(`地块${idx + 1}: 点数不足`);
+                        status = 'error';
+                        return;
+                    }
+                    const firstRaw = points[0].raw.trim();
+                    const lastRaw = points[points.length - 1].raw.trim();
+                    if (firstRaw !== lastRaw) {
+                        const p1 = points[0];
+                        const p2 = points[points.length - 1];
+                        if (Math.abs(p1.x - p2.x) > 1e-6 || Math.abs(p1.y - p2.y) > 1e-6) {
+                            messages.push(`地块${idx + 1}: 首尾不一致`);
+                            hasMismatch = true;
+                        }
+                    }
+                    const dists = calcDistances(points);
+                    for (const d of dists) {
+                        if (d.dist < 0.01) {
+                            messages.push(`地块${idx + 1}: 点密集`);
+                            hasDense = true;
+                        }
+                    }
+                });
+
+                if (hasDense || hasMismatch) status = 'warning';
+                return { file, status, messages };
+            } catch (e) {
+                return { file, status: 'error', messages: [e.message] };
+            }
+        }
+
+        async function fixFile(file, mode) {
+            try {
+                const { lines } = await readTxtFile(file);
+                let currentBlockLines = [];
+                let inCoords = false;
+                let blockHeader = null;
+                const allBlocks = [];
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (trimmed.startsWith('[地块坐标]')) { inCoords = true; continue; }
+                    if (!inCoords) continue;
+                    if ((trimmed.match(/,/g) || []).length >= 8 && trimmed.endsWith('@')) {
+                        if (currentBlockLines.length > 0) {
+                            allBlocks.push({ header: blockHeader, lines: currentBlockLines });
+                            currentBlockLines = [];
+                        }
+                        blockHeader = line;
+                        continue;
+                    }
+                    if ((trimmed.match(/,/g) || []).length >= 3) currentBlockLines.push(line);
+                }
+                if (currentBlockLines.length > 0) allBlocks.push({ header: blockHeader, lines: currentBlockLines });
+
+                let zoneNumber = '00';
+                if (allBlocks.length > 0 && allBlocks[0].lines.length > 0) {
+                    try {
+                        const parts = allBlocks[0].lines[0].trim().split(',');
+                        zoneNumber = String(Math.floor(parseFloat(parts[3]))).substring(0, 2);
+                    } catch (e) { }
+                }
+
+                let outputContent = '[属性描述]\n坐标系=2000国家大地坐标系\n几度分带=3\n投影类型=高斯克吕格\n计量单位=米\n';
+                outputContent += `带号=${zoneNumber}\n精度=0.001\n数据生成=永雏塔菲\n[地块坐标]\n`;
+
+                let totalAreaHa = 0;
+
+                for (let i = 0; i < allBlocks.length; i++) {
+                    let { lines: blockLines } = allBlocks[i];
+                    if (mode === 'dense' || mode === 'all') {
+                        blockLines = fixDensePoints(blockLines).fixedLines;
+                    }
+
+                    const points = [];
+                    for (const line of blockLines) {
+                        const parts = line.trim().split(',');
+                        try { points.push({ x: parseFloat(parts[3]), y: parseFloat(parts[2]) }); } catch (e) { }
+                    }
+
+                    const ringStartIndices = [0];
+                    const n = points.length;
+                    let currentFirstXY = points[0];
+                    let k = 1;
+                    while (k < n - 1) {
+                        if (points[k].x === currentFirstXY.x && points[k].y === currentFirstXY.y && k + 1 < n) {
+                            ringStartIndices.push(k + 1);
+                            currentFirstXY = points[k + 1];
+                            k += 1;
+                        }
+                        k += 1;
+                    }
+                    ringStartIndices.push(n);
+
+                    let fixedBlockContent = '';
+                    let ringNum = 1;
+                    let ringIdx = 0;
+                    for (let j = 0; j < n; j++) {
+                        while (ringIdx + 1 < ringStartIndices.length && j >= ringStartIndices[ringIdx + 1]) {
+                            ringIdx++; ringNum++;
+                        }
+                        let jnum = (j === n - 1) ? 1 : j + 1;
+                        fixedBlockContent += `J${jnum},${ringNum},${points[j].y.toFixed(3)},${points[j].x.toFixed(3)}\n`;
+                    }
+
+                    if (ringStartIndices.length === 2 && (points[0].x !== points[n - 1].x || points[0].y !== points[n - 1].y)) {
+                        fixedBlockContent += `J1,1,${points[0].y.toFixed(3)},${points[0].x.toFixed(3)}\n`;
+                        points.push(points[0]);
+                    }
+
+                    const areaM2 = polygonWithRingsArea(points, ringStartIndices);
+                    const areaHa = areaM2 * 0.0001;
+                    totalAreaHa += areaHa;
+
+                    const lineCount = fixedBlockContent.trim().split('\n').length;
+                    const groupNum = i;
+                    outputContent += `${lineCount},${areaHa.toFixed(6)},${groupNum},地块${groupNum},面,图幅号,地块用途,地类编码,@\n`;
+                    outputContent += fixedBlockContent;
+                }
+
+                const originalName = file.name.replace(/\.txt$/i, '');
+                const suffix = mode === 'dense' ? '_distfixed' : '_normalized';
+                let baseName = originalName.replace(/_normalized$/, '').replace(/_distfixed$/, '').replace(/_\d+\.\d{6}$/, '');
+                const newFilename = `${baseName}_${totalAreaHa.toFixed(6)}${suffix}.txt`;
+
+                return {
+                    file,
+                    status: 'normal',
+                    messages: ['已修复'],
+                    processedContent: outputContent,
+                    processedFilename: newFilename
+                };
+            } catch (e) {
+                return { file, status: 'error', messages: [e.message] };
+            }
+        }
+
+        // --- UI Logic ---
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileListEl = document.getElementById('fileList');
+        const fileCountEl = document.getElementById('fileCount');
+        const btnFixDense = document.getElementById('btnFixDense');
+        const btnNormalize = document.getElementById('btnNormalize');
+        const btnFixAll = document.getElementById('btnFixAll');
+        const btnDownloadAll = document.getElementById('btnDownloadAll');
+        const btnClear = document.getElementById('btnClear');
+
+        let filesData = []; // Array of { file, status, messages, processedContent, processedFilename }
+
+        // Dropzone Events
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(fileList) {
+            const newFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.txt'));
+            if (newFiles.length === 0) return;
+
+            // Add placeholders
+            newFiles.forEach(f => {
+                filesData.push({ file: f, status: 'processing', messages: [] });
+            });
+            renderFileList();
+            updateControls();
+
+            // Process
+            const startIndex = filesData.length - newFiles.length;
+            for (let i = 0; i < newFiles.length; i++) {
+                const result = await processFile(newFiles[i]);
+                filesData[startIndex + i] = result;
+            }
+            renderFileList();
+            updateControls();
+        }
+
+        function renderFileList() {
+            fileListEl.innerHTML = '';
+            fileCountEl.textContent = filesData.length;
+
+            filesData.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+
+                let statusClass = 'status-processing';
+                let statusText = '处理中';
+                if (item.status === 'normal') { statusClass = 'status-normal'; statusText = '正常'; }
+                else if (item.status === 'warning') { statusClass = 'status-warning'; statusText = '警告'; }
+                else if (item.status === 'error') { statusClass = 'status-error'; statusText = '错误'; }
+
+                let downloadBtn = '';
+                if (item.processedContent) {
+                    downloadBtn = `<button class="download-btn" onclick="downloadSingle(${idx})" title="下载">⬇</button>`;
+                }
+
+                div.innerHTML = `
+                <div class="file-info">
+                    <span class="file-name" title="${item.file.name}">${item.file.name}</span>
+                    <span class="file-size">${(item.file.size / 1024).toFixed(1)} KB</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="status-badge ${statusClass}" title="${item.messages.join('\n')}">${statusText}</span>
+                    ${downloadBtn}
+                </div>
+            `;
+                fileListEl.appendChild(div);
+            });
+        }
+
+        function updateControls() {
+            const hasFiles = filesData.length > 0;
+            const hasProcessed = filesData.some(f => f.processedContent);
+
+            btnFixDense.disabled = !hasFiles;
+            btnNormalize.disabled = !hasFiles;
+            btnFixAll.disabled = !hasFiles;
+            btnClear.disabled = !hasFiles;
+            btnDownloadAll.disabled = !hasProcessed;
+        }
+
+        // Actions
+        window.downloadSingle = (idx) => {
+            const item = filesData[idx];
+            if (!item.processedContent) return;
+            const blob = new Blob([item.processedContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = item.processedFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        async function runFix(mode) {
+            // Show processing state?
+            // For simplicity, just run and update
+            for (let i = 0; i < filesData.length; i++) {
+                // Update status to processing visually? 
+                // Skipping visual update for speed, just wait for result
+                filesData[i] = await fixFile(filesData[i].file, mode);
+            }
+            renderFileList();
+            updateControls();
+        }
+
+        btnFixDense.addEventListener('click', () => runFix('dense'));
+        btnNormalize.addEventListener('click', () => runFix('normalize'));
+        btnFixAll.addEventListener('click', () => runFix('all'));
+
+        btnClear.addEventListener('click', () => {
+            filesData = [];
+            renderFileList();
+            updateControls();
+            fileInput.value = '';
+        });
+
+        btnDownloadAll.addEventListener('click', async () => {
+            const zip = new JSZip();
+            let count = 0;
+            filesData.forEach(item => {
+                if (item.processedContent) {
+                    zip.file(item.processedFilename, item.processedContent);
+                    count++;
+                }
+            });
+            if (count === 0) return;
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'processed_files.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+    </script>
+</body>
+
+</html>
